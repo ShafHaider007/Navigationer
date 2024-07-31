@@ -27,19 +27,3 @@
   display: none;
 }
 
-.animate-route-button {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 1;
-  padding: 10px;
-  background-color: #ffffff;
-  border: none;
-  cursor: pointer;
-  border-radius: 5px;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-}
-
-.animate-route-button:hover {
-  background-color: #f0f0f0;
-}
