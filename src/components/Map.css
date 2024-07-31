@@ -27,3 +27,35 @@
   display: none;
 }
 
+.estimated-time {
+  position: absolute;
+  top: 10px; /* Position it at the very top */
+  right: 42px; /* Align it to the right */
+  background-color: rgba(0, 0, 0, 0.75); /* Darker background for better visibility */
+  color: #fff; /* White text color */
+  padding: 10px 15px; /* Increased padding for better spacing */
+  border-radius: 8px; /* Slightly rounded corners */
+  font-size: 16px; /* Increased font size for readability */
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); /* Subtle shadow for depth */
+  z-index: 2; /* Ensure it is above other map elements */
+  transition: all 0.3s ease; /* Smooth transition for changes */
+}
+
+@media (max-width: 768px) {
+  .estimated-time {
+    font-size: 14px; /* Slightly smaller font size for tablets and smaller screens */
+    padding: 9px 12px; /* Adjusted padding */
+    top: 50px; /* Adjusted position for smaller screens */
+    right: 20px; /* Adjusted position for smaller screens */
+  }
+}
+
+@media (max-width: 480px) {
+  .estimated-time {
+    font-size: 12px; /* Smaller font size for mobile devices */
+    padding: 6px 10px; /* Adjusted padding */
+    top: 60px; /* Adjusted position for mobile devices */
+    right: 10px; /* Adjusted position for mobile devices */
+  }
+}

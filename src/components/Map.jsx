@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import MapboxDirections from "@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions";
 import "@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions.css";
+import polyline from "@mapbox/polyline"; // Import the polyline package
 import "./Map.css";
 
 mapboxgl.accessToken =
@@ -10,6 +11,7 @@ mapboxgl.accessToken =
 const Map = () => {
   const mapContainerRef = useRef(null);
   const [map, setMap] = useState(null);
+  const [estimatedTime, setEstimatedTime] = useState(null); // State for estimated time
 
   useEffect(() => {
     const mapInstance = new mapboxgl.Map({
@@ -46,6 +48,7 @@ const Map = () => {
       },
       flyTo: false, // Disable automatic fly to the route
     });
+
     mapInstance.addControl(directions, "top-left");
 
     // Add traffic layer to the map
@@ -77,8 +80,55 @@ const Map = () => {
             "#cc0000",
             "#cccccc", // Default color if no congestion data is available
           ],
-          "line-width": 3,
+          "line-width": 2,
         },
+      });
+
+      // Listen for route changes and update estimated time
+      directions.on("route", (event) => {
+        if (event.route.length) {
+          const route = event.route[0];
+          const duration = route.duration; // Duration in seconds
+          setEstimatedTime(duration); // Update the estimated time state
+
+          const decodedGeometry = polyline.decode(route.geometry); // Decode the polyline
+          console.log("Decoded route geometry:", decodedGeometry); // Log the decoded coordinates
+
+          // Convert to GeoJSON LineString
+          const geojsonLineString = {
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: decodedGeometry.map((coord) => [coord[1], coord[0]]), // Ensure the coordinates are in [lng, lat] format
+            },
+            properties: {},
+          };
+
+          // Add the GeoJSON as a new source
+          if (mapInstance.getSource("route")) {
+            mapInstance.getSource("route").setData(geojsonLineString);
+          } else {
+            mapInstance.addSource("route", {
+              type: "geojson",
+              data: geojsonLineString,
+            });
+
+            // Add a new layer to use this source
+            mapInstance.addLayer({
+              id: "route",
+              type: "line",
+              source: "route",
+              layout: {
+                "line-join": "round",
+                "line-cap": "round",
+              },
+              paint: {
+                "line-color": "#FF0000",
+                "line-width": 4,
+              },
+            });
+          }
+        }
       });
     });
 
@@ -91,6 +141,11 @@ const Map = () => {
   return (
     <div className="map-wrapper">
       <div ref={mapContainerRef} className="map-container" />
+      {estimatedTime && (
+        <div className="estimated-time">
+          Estimated Time: {(estimatedTime / 60).toFixed(2)} minutes
+        </div>
+      )}
     </div>
   );
 };
