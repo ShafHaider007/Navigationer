@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import MapboxDirections from "@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions";
+import "@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions.css";
 import "./Map.css";
 
 mapboxgl.accessToken =
@@ -7,30 +9,83 @@ mapboxgl.accessToken =
 
 const Map = () => {
   const mapContainerRef = useRef(null);
+  const [map, setMap] = useState(null);
 
   useEffect(() => {
-    const map = new mapboxgl.Map({
+    const mapInstance = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: "mapbox://styles/mapbox/streets-v11",
-      center: [-74.5, 40], // Starting position [lng, lat]
+      center: [73.0479, 33.6844],
       zoom: 9, // Starting zoom level
     });
 
     // Add navigation control (the +/- zoom buttons)
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    mapInstance.addControl(new mapboxgl.NavigationControl(), "top-right");
 
-    // Add a marker with some info
-    const marker = new mapboxgl.Marker()
-      .setLngLat([-74.5, 40])
-      .setPopup(
-        new mapboxgl.Popup().setHTML(
-          "<h3>Marker Info</h3><p>This is a marker.</p>"
-        )
-      )
-      .addTo(map);
+    // Add geolocate control to the map.
+    const geolocateControl = new mapboxgl.GeolocateControl({
+      positionOptions: {
+        enableHighAccuracy: true,
+      },
+      trackUserLocation: true,
+      showUserHeading: true,
+    });
+    mapInstance.addControl(geolocateControl, "top-left");
+
+    // Add customized route control using Mapbox Directions API with driving-traffic profile
+    const directions = new MapboxDirections({
+      accessToken: mapboxgl.accessToken,
+      unit: "metric",
+      profile: "mapbox/driving-traffic", // Use the driving-traffic profile for real-time traffic data
+      alternatives: true, // Show alternative routes
+      congestion: true, // Highlight areas of congestion
+      controls: {
+        inputs: true, // Show input controls for origin and destination
+        instructions: true, // Show route instructions
+        profileSwitcher: true, // Allow switching between profiles (e.g., driving, walking, cycling)
+      },
+      flyTo: false, // Disable automatic fly to the route
+    });
+    mapInstance.addControl(directions, "top-left");
+
+    // Add traffic layer to the map
+    mapInstance.on("load", () => {
+      mapInstance.addSource("traffic", {
+        type: "vector",
+        url: "mapbox://mapbox.mapbox-traffic-v1",
+      });
+
+      mapInstance.addLayer({
+        id: "traffic",
+        type: "line",
+        source: "traffic",
+        "source-layer": "traffic",
+        layout: {
+          "line-join": "round",
+          "line-cap": "round",
+        },
+        paint: {
+          "line-color": [
+            "case",
+            ["==", ["get", "congestion"], "low"],
+            "#33cc33",
+            ["==", ["get", "congestion"], "moderate"],
+            "#ffcc00",
+            ["==", ["get", "congestion"], "heavy"],
+            "#ff6600",
+            ["==", ["get", "congestion"], "severe"],
+            "#cc0000",
+            "#cccccc", // Default color if no congestion data is available
+          ],
+          "line-width": 3,
+        },
+      });
+    });
+
+    setMap(mapInstance);
 
     // Clean up on unmount
-    return () => map.remove();
+    return () => mapInstance.remove();
   }, []);
 
   return (
