@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import MapboxDirections from "@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions";
 import "@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions.css";
-import polyline from "@mapbox/polyline"; // Import the polyline package
+import polyline from "@mapbox/polyline";
+import * as turf from "@turf/turf";
 import "./Map.css";
 
 mapboxgl.accessToken =
@@ -19,6 +20,7 @@ const Map = () => {
       style: "mapbox://styles/mapbox/streets-v11",
       center: [73.0479, 33.6844],
       zoom: 9, // Starting zoom level
+      pitch: 45, // Initial pitch of the camera
     });
 
     // Add navigation control (the +/- zoom buttons)
@@ -55,7 +57,7 @@ const Map = () => {
     mapInstance.on("load", () => {
       mapInstance.addSource("traffic", {
         type: "vector",
-        url: "mapbox://mapbox.mapbox-traffic-v1",
+        url: "mapbox://styles/mapbox/outdoors-v12",
       });
 
       mapInstance.addLayer({
@@ -128,6 +130,20 @@ const Map = () => {
               },
             });
           }
+
+          // Set initial camera position to the starting point of the route
+          const startCoord = geojsonLineString.geometry.coordinates[0];
+          mapInstance.jumpTo({
+            center: startCoord,
+            zoom: 15, // Adjust the zoom level as needed
+            pitch: 45,
+          });
+
+          // Start animating the camera along the route
+          animateCameraAlongRoute(
+            mapInstance,
+            geojsonLineString.geometry.coordinates
+          );
         }
       });
     });
@@ -137,6 +153,57 @@ const Map = () => {
     // Clean up on unmount
     return () => mapInstance.remove();
   }, []);
+
+  // Function to animate the camera along the route
+  const animateCameraAlongRoute = (map, coordinates) => {
+    const animationDuration = 100000; // Duration of the animation in milliseconds (10 minutes)
+    const cameraAltitude = 25; // Altitude of the camera
+    const routeDistance = turf.length(turf.lineString(coordinates));
+
+    let start;
+
+    function frame(time) {
+      if (!start) start = time;
+      const phase = (time - start) / animationDuration;
+
+      if (phase > 1) {
+        start = time;
+      }
+
+      // Calculate the current position along the route
+      const alongRoute = turf.along(
+        turf.lineString(coordinates),
+        routeDistance * phase
+      ).geometry.coordinates;
+
+      const camera = map.getFreeCameraOptions();
+      camera.position = mapboxgl.MercatorCoordinate.fromLngLat(
+        {
+          lng: alongRoute[0],
+          lat: alongRoute[1],
+        },
+        cameraAltitude
+      );
+
+      // Ensure the camera looks at a consistent pitch and a fixed point ahead
+      const lookAtDistance = 0.1; // Distance ahead to look at (adjust as needed)
+      const target = turf.along(
+        turf.lineString(coordinates),
+        routeDistance * (phase + lookAtDistance)
+      ).geometry.coordinates;
+
+      camera.lookAtPoint({
+        lng: target[0],
+        lat: target[1],
+      });
+
+      map.setFreeCameraOptions(camera);
+
+      window.requestAnimationFrame(frame);
+    }
+
+    window.requestAnimationFrame(frame);
+  };
 
   return (
     <div className="map-wrapper">
