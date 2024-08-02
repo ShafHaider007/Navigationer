@@ -4,6 +4,7 @@ import MapboxDirections from "@mapbox/mapbox-gl-directions/dist/mapbox-gl-direct
 import "@mapbox/mapbox-gl-directions/dist/mapbox-gl-directions.css";
 import polyline from "@mapbox/polyline";
 import "./Map.css";
+import * as turf from "@turf/turf";
 
 mapboxgl.accessToken =
   "pk.eyJ1Ijoic2hhZmhhaWRlcjAwNyIsImEiOiJjbHh2ZjZvenUwa3B2MmxzZ2htYm42YzA0In0.dArFMIkjpRvynwAnMq0dfA";
@@ -94,12 +95,38 @@ const Map = () => {
           const decodedGeometry = polyline.decode(route.geometry); // Decode the polyline
           console.log("Decoded route geometry:", decodedGeometry); // Log the decoded coordinates
 
+          // Create the routes object with an offset for the camera path
+          const targetRoute = decodedGeometry.map((coord) => [
+            coord[1],
+            coord[0],
+          ]);
+          const cameraRoute = decodedGeometry.map((coord, index) => {
+            if (index === 0) return [coord[1], coord[0]];
+            const prevCoord = decodedGeometry[index - 1];
+            const offset = turf.destination(
+              turf.point([prevCoord[1], prevCoord[0]]),
+              0.01, // Adjust this distance to control the offset
+              turf.bearing(
+                turf.point([prevCoord[1], prevCoord[0]]),
+                turf.point([coord[1], coord[0]])
+              )
+            ).geometry.coordinates;
+            return [offset[0], offset[1]];
+          });
+
+          const routes = {
+            target: targetRoute,
+            camera: cameraRoute,
+          };
+
+          console.log("Routes:", routes); // Log the routes object
+
           // Convert to GeoJSON LineString
           const geojsonLineString = {
             type: "Feature",
             geometry: {
               type: "LineString",
-              coordinates: decodedGeometry.map((coord) => [coord[1], coord[0]]), // Ensure the coordinates are in [lng, lat] format
+              coordinates: routes.target, // Ensure the coordinates are in [lng, lat] format
             },
             properties: {},
           };
@@ -129,13 +156,70 @@ const Map = () => {
             });
           }
 
-          // Set initial camera position to the starting point of the route
-          const startCoord = geojsonLineString.geometry.coordinates[0];
-          mapInstance.jumpTo({
-            center: startCoord,
-            zoom: 20, // Adjust the zoom level as needed
-            pitch: 60, // Set the initial pitch to 60
-          });
+          const animateCamera = () => {
+            const animationDuration = 120000;
+            const cameraAltitude = 100;
+            const routeDistance = turf.length(turf.lineString(routes.target), {
+              units: "kilometers",
+            });
+            const cameraRouteDistance = turf.length(
+              turf.lineString(routes.camera),
+              { units: "kilometers" }
+            );
+
+            let start;
+
+            function frame(time) {
+              if (!start) start = time;
+              const phase = (time - start) / animationDuration;
+
+              if (phase > 1) {
+                setTimeout(() => {
+                  start = 0.0;
+                }, 1500);
+              }
+
+              const alongRoute = turf.along(
+                turf.lineString(routes.target),
+                routeDistance * phase,
+                { units: "kilometers" }
+              ).geometry.coordinates;
+              const alongCamera = turf.along(
+                turf.lineString(routes.camera),
+                cameraRouteDistance * phase,
+                { units: "kilometers" }
+              ).geometry.coordinates;
+
+              const camera = mapInstance.getFreeCameraOptions();
+
+              camera.position = mapboxgl.MercatorCoordinate.fromLngLat(
+                {
+                  lng: alongCamera[0],
+                  lat: alongCamera[1],
+                },
+                cameraAltitude
+              );
+
+              camera.lookAtPoint({
+                lng: alongRoute[0],
+                lat: alongRoute[1],
+              });
+
+              const bearing = turf.bearing(
+                turf.point(alongCamera),
+                turf.point(alongRoute)
+              );
+
+              camera.setPitchBearing(80, bearing);
+              mapInstance.setFreeCameraOptions(camera);
+
+              window.requestAnimationFrame(frame);
+            }
+
+            window.requestAnimationFrame(frame);
+          };
+
+          animateCamera();
         }
       });
     });
