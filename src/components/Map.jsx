@@ -157,8 +157,8 @@ const Map = () => {
           }
 
           const animateCamera = () => {
-            const animationDuration = 120000;
-            const cameraAltitude = 100;
+            const animationDuration = 110000;
+            const cameraAltitude = 5;
             const routeDistance = turf.length(turf.lineString(routes.target), {
               units: "kilometers",
             });
@@ -210,7 +210,7 @@ const Map = () => {
                 turf.point(alongRoute)
               );
 
-              camera.setPitchBearing(80, bearing);
+              camera.setPitchBearing(75, bearing+10);
               mapInstance.setFreeCameraOptions(camera);
 
               window.requestAnimationFrame(frame);
