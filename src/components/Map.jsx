@@ -210,7 +210,7 @@ const Map = () => {
                 turf.point(alongRoute)
               );
 
-              camera.setPitchBearing(75, bearing+10);
+              camera.setPitchBearing(75, bearing + 10);
               mapInstance.setFreeCameraOptions(camera);
 
               window.requestAnimationFrame(frame);
